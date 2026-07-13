@@ -15,7 +15,7 @@ from yolov8_trt import YoloV8TRT
 
 # ---------------- camera geometry (SET THESE FOR YOUR ROBOT) ----------------
 CAM_HEIGHT_CM = 9.0  # camera optical center above the ground, in cm
-CAM_PITCH_DEG = 10.0    # downward tilt of the camera (0 = looking horizontal)
+CAM_PITCH_DEG = -10.0    # downward tilt of the camera (0 = looking horizontal)
 CAM_HFOV_DEG  = 62.2   # horizontal field of view (62.2 = Raspberry Pi cam v2)
 
 class GroundPlaneMapper(object):
