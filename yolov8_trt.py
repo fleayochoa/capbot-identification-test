@@ -3,7 +3,6 @@ import numpy as np
 import cv2
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit   # creates the CUDA context
 
 class YoloV8TRT:
     def __init__(self, engine_path, imgsz=416, conf_th=0.40, iou_th=0.50):

@@ -4,6 +4,7 @@ import time
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+import pycuda.driver as cuda
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
@@ -35,6 +36,8 @@ store = FrameStore()
 
 # ---------------- perception loop ----------------
 def perception_loop():
+    cuda.init()
+    cuda_ctx = cuda.Device(0).make_context()   # context lives in THIS thread
     GST = ("nvarguscamerasrc ! video/x-raw(memory:NVMM),width=1280,height=720,"
            "framerate=5/1 ! nvvidconv ! video/x-raw,format=BGRx ! "
            "videoconvert ! video/x-raw,format=BGR ! appsink drop=1 max-buffers=1")
