@@ -38,34 +38,37 @@ store = FrameStore()
 def perception_loop():
     cuda.init()
     cuda_ctx = cuda.Device(0).make_context()   # context lives in THIS thread
-    GST = ("nvarguscamerasrc ! video/x-raw(memory:NVMM),width=1280,height=720,"
-           "framerate=5/1 ! nvvidconv ! video/x-raw,format=BGRx ! "
-           "videoconvert ! video/x-raw,format=BGR ! appsink drop=1 max-buffers=1")
-    cap = cv2.VideoCapture(GST, cv2.CAP_GSTREAMER)
-    # cap = cv2.VideoCapture(0)   # USB camera instead
-    assert cap.isOpened(), "camera failed to open"
+    try:
+        GST = ("nvarguscamerasrc ! video/x-raw(memory:NVMM),width=1280,height=720,"
+            "framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! "
+            "videoconvert ! video/x-raw,format=BGR ! appsink drop=1 max-buffers=1")
+        cap = cv2.VideoCapture(GST, cv2.CAP_GSTREAMER)
+        # cap = cv2.VideoCapture(0)   # USB camera instead
+        assert cap.isOpened(), "camera failed to open"
 
-    det = YoloV8TRT("yolov8n_fp16.engine", conf_th=0.25)
-    t_prev = time.time()
+        det = YoloV8TRT("yolov8n_fp16.engine", conf_th=0.25)
+        t_prev = time.time()
 
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            time.sleep(0.1)
-            continue
-        dets = det.infer(frame)
-        t_now = time.time()
-        fps = 1.0 / max(t_now - t_prev, 1e-6)
-        t_prev = t_now
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                time.sleep(0.1)
+                continue
+            dets = det.infer(frame)
+            t_now = time.time()
+            fps = 1.0 / max(t_now - t_prev, 1e-6)
+            t_prev = t_now
 
-        for d in dets:
-            x1, y1, x2, y2 = [int(v) for v in d["box"]]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, "%.2f" % d["conf"], (x1, y1 - 6),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        cv2.putText(frame, "%.1f FPS  obstacles: %d" % (fps, len(dets)),
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-        store.update(frame)
+            for d in dets:
+                x1, y1, x2, y2 = [int(v) for v in d["box"]]
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, "%.2f" % d["conf"], (x1, y1 - 6),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(frame, "%.1f FPS  obstacles: %d" % (fps, len(dets)),
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            store.update(frame)
+    finally:
+        cuda_ctx.pop()
 
 # ---------------- HTTP / MJPEG ----------------
 class StreamHandler(BaseHTTPRequestHandler):
