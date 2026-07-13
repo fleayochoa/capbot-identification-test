@@ -15,8 +15,12 @@ from yolov8_trt import YoloV8TRT
 
 # ---------------- camera geometry (SET THESE FOR YOUR ROBOT) ----------------
 CAM_HEIGHT_CM = 9.0  # camera optical center above the ground, in cm
-CAM_PITCH_DEG = -10.0    # downward tilt of the camera (0 = looking horizontal)
+CAM_PITCH_DEG = 0.0    # downward tilt of the camera (0 = looking horizontal)
 CAM_HFOV_DEG  = 62.2   # horizontal field of view (62.2 = Raspberry Pi cam v2)
+CAM_MIN_GROUND_CM = 29  # measured distance (cm) from the camera to the
+                          # closest ground point visible at the BOTTOM edge
+                          # of the image. If set, the camera pitch is
+                          # calibrated from it and CAM_PITCH_DEG is ignored.
 
 class GroundPlaneMapper(object):
     """Approximate obstacle distance from a single camera.
@@ -29,13 +33,20 @@ class GroundPlaneMapper(object):
     def __init__(self, img_w, img_h,
                  height_cm=CAM_HEIGHT_CM,
                  pitch_deg=CAM_PITCH_DEG,
-                 hfov_deg=CAM_HFOV_DEG):
+                 hfov_deg=CAM_HFOV_DEG,
+                 min_ground_cm=CAM_MIN_GROUND_CM):
         self.cx = img_w / 2.0
         self.cy = img_h / 2.0
         self.fx = (img_w / 2.0) / math.tan(math.radians(hfov_deg) / 2.0)
         self.fy = self.fx                      # square pixels assumed
         self.height = height_cm
-        self.pitch = math.radians(pitch_deg)
+        if min_ground_cm is not None:
+            # The bottom image row sees the ground at min_ground_cm, i.e.
+            # min_ground = H / tan(pitch + beta_bottom); solve for pitch.
+            beta = math.atan2(img_h - self.cy, self.fy)
+            self.pitch = math.atan2(height_cm, min_ground_cm) - beta
+        else:
+            self.pitch = math.radians(pitch_deg)
 
     def locate(self, u, v):
         """Pixel (u, v) of a ground-contact point -> (forward_cm, lateral_cm)
@@ -113,6 +124,11 @@ def perception_loop():
                 continue
             if mapper is None:
                 mapper = GroundPlaneMapper(frame.shape[1], frame.shape[0])
+                near = mapper.locate(frame.shape[1] / 2.0, frame.shape[0])
+                print("ground-plane: pitch %.1f deg down, nearest visible "
+                      "ground %s cm"
+                      % (math.degrees(mapper.pitch),
+                         "inf" if near is None else "%.1f" % near[0]))
             dets = det.infer(frame)
             t_now = time.time()
             fps = 1.0 / max(t_now - t_prev, 1e-6)
@@ -121,12 +137,17 @@ def perception_loop():
             obstacles = []
             for d in dets:
                 x1, y1, x2, y2 = [int(v) for v in d["box"]]
-                # bottom-center of the box = assumed ground-contact point
+                # bottom-center of the box = assumed ground-contact point;
+                # if the box touches the frame bottom the contact point is
+                # out of view, so the distance is only an upper bound
+                clipped = y2 >= frame.shape[0] - 3
                 pos = mapper.locate((x1 + x2) / 2.0, y2)
                 if pos is not None:
                     fwd, lat = pos
                     dist = math.hypot(fwd, lat)
-                    label = "%.2f  %dcm" % (d["conf"], int(round(dist)))
+                    label = "%.2f  %s%dcm" % (d["conf"],
+                                              "<" if clipped else "",
+                                              int(round(dist)))
                 else:
                     fwd = lat = dist = None
                     label = "%.2f  far" % d["conf"]
@@ -135,6 +156,7 @@ def perception_loop():
                     box=[x1, y1, x2, y2],
                     conf=round(d["conf"], 3),
                     cls=d["cls"],
+                    clipped=clipped,
                     forward_cm=None if fwd is None else round(fwd, 1),
                     lateral_cm=None if lat is None else round(lat, 1),
                     distance_cm=None if dist is None else round(dist, 1)))
@@ -166,7 +188,8 @@ class StreamHandler(BaseHTTPRequestHandler):
                     b"var s=j.fps+' FPS  '+j.obstacles.length+' obstacle(s)\\n';"
                     b"j.obstacles.forEach(function(o,i){"
                     b"s+='#'+i+' cls '+o.cls+' conf '+o.conf+"
-                    b"'  dist '+(o.distance_cm==null?'?':o.distance_cm+' cm')+"
+                    b"'  dist '+(o.distance_cm==null?'?':"
+                    b"(o.clipped?'<':'')+o.distance_cm+' cm')+"
                     b"'  fwd '+(o.forward_cm==null?'?':o.forward_cm)+"
                     b"'  lat '+(o.lateral_cm==null?'?':o.lateral_cm)+'\\n';});"
                     b"document.getElementById('det').textContent=s;});"
