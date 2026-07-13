@@ -9,7 +9,7 @@ except ImportError:                      # Python 3.6
     from http.server import HTTPServer
     class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
         daemon_threads = True
-        
+
 from yolov8_trt import YoloV8TRT
 
 # ---------------- shared state ----------------
@@ -38,7 +38,7 @@ store = FrameStore()
 # ---------------- perception loop ----------------
 def perception_loop():
     GST = ("nvarguscamerasrc ! video/x-raw(memory:NVMM),width=1280,height=720,"
-           "framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! "
+           "framerate=5/1 ! nvvidconv ! video/x-raw,format=BGRx ! "
            "videoconvert ! video/x-raw,format=BGR ! appsink drop=1 max-buffers=1")
     cap = cv2.VideoCapture(GST, cv2.CAP_GSTREAMER)
     # cap = cv2.VideoCapture(0)   # USB camera instead
