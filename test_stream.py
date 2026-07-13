@@ -2,13 +2,11 @@
 import cv2
 import time
 import threading
-try:
-    from http.server import ThreadingHTTPServer
-except ImportError:                      # Python 3.6
-    from socketserver import ThreadingMixIn
-    from http.server import HTTPServer
-    class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
-        daemon_threads = True
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 from yolov8_trt import YoloV8TRT
 
