@@ -113,7 +113,7 @@ def perception_loop():
         # cap = cv2.VideoCapture(0)   # USB camera instead
         assert cap.isOpened(), "camera failed to open"
 
-        det = YoloV8TRT("yolov8n_fp16.engine", conf_th=0.4)
+        det = YoloV8TRT("bottles_fp16.engine", conf_th=0.25)
         mapper = None
         t_prev = time.time()
 
