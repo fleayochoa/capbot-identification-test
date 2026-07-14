@@ -31,7 +31,7 @@ def main():
     cuda.init()
     cuda_ctx = cuda.Device(0).make_context()   # context lives in this thread
     try:
-        det = YoloV8TRT(ENGINE, conf_th=0.25)
+        det = YoloV8TRT(ENGINE, conf_th=0.4)
         os.makedirs(OUT_DIR, exist_ok=True)
         mappers = {}                           # (w, h) -> GroundPlaneMapper
 
